@@ -1,0 +1,69 @@
+:root {
+  /* Light theme */
+  --bg-base: rgba(243, 243, 243, 0.85);
+  --bg-card: rgba(255, 255, 255, 0.7);
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-active: rgba(0, 0, 0, 0.06);
+  --bg-solid: #f3f3f3;
+  --text-primary: #1a1a1a;
+  --text-secondary: #616161;
+  --text-disabled: #a0a0a0;
+  --accent: #005fb8;
+  --accent-hover: #004c99;
+  --accent-text: #ffffff;
+  --border-card: rgba(0, 0, 0, 0.06);
+  --border-control: rgba(0, 0, 0, 0.08);
+  --border-subtle: rgba(0, 0, 0, 0.04);
+  --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.04);
+  --shadow-flyout: 0 8px 16px rgba(0, 0, 0, 0.14);
+  --radius: 6px;
+  --radius-sm: 4px;
+  --font-ui: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  --font-editor: 'Cascadia Code', 'Consolas', 'Courier New', monospace;
+  --font-size-ui: 13px;
+  --font-size-editor: 14px;
+  --titlebar-height: 32px;
+  --tabbar-height: 36px;
+  --statusbar-height: 24px;
+
+  /* Menu specific */
+  --menu-bg: rgba(252, 252, 252, 0.95);
+  --menu-border: rgba(0, 0, 0, 0.08);
+  --menu-shadow: 0 8px 16px rgba(0, 0, 0, 0.14);
+  --menu-hover: rgba(0, 0, 0, 0.04);
+  --menu-active: rgba(0, 0, 0, 0.06);
+
+  /* Window controls */
+  --close-hover: #c42b1c;
+  --close-active: #b4271a;
+  --close-text: #ffffff;
+}
+
+:root.dark {
+  --bg-base: rgba(32, 32, 32, 0.85);
+  --bg-card: rgba(44, 44, 44, 0.7);
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --bg-active: rgba(255, 255, 255, 0.04);
+  --bg-solid: #202020;
+  --text-primary: #ffffff;
+  --text-secondary: #9a9a9a;
+  --text-disabled: #5a5a5a;
+  --accent: #60cdff;
+  --accent-hover: #78d7ff;
+  --accent-text: #003e6e;
+  --border-card: rgba(255, 255, 255, 0.06);
+  --border-control: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.04);
+  --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.2);
+  --shadow-flyout: 0 8px 16px rgba(0, 0, 0, 0.36);
+
+  --menu-bg: rgba(44, 44, 44, 0.95);
+  --menu-border: rgba(255, 255, 255, 0.08);
+  --menu-shadow: 0 8px 16px rgba(0, 0, 0, 0.36);
+  --menu-hover: rgba(255, 255, 255, 0.06);
+  --menu-active: rgba(255, 255, 255, 0.04);
+
+  --close-hover: #c42b1c;
+  --close-active: #b4271a;
+  --close-text: #ffffff;
+}
