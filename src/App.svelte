@@ -3,10 +3,12 @@
   import TabBar from './lib/components/TabBar.svelte'
   import EditorArea from './lib/components/EditorArea.svelte'
   import FindReplace from './lib/components/FindReplace.svelte'
+  import SettingsPage from './lib/components/SettingsPage.svelte'
   import StatusBar from './lib/components/StatusBar.svelte'
   import { onMount } from 'svelte'
   import { tabStore } from './lib/stores/tabs.svelte'
   import { appState } from './lib/stores/app.svelte'
+  import { settingsStore } from './lib/stores/settings.svelte'
   import { handleOpen, handleSave, handleSaveAs, handleOpenPath } from './lib/commands/file'
   import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
   import { ask, message } from '@tauri-apps/plugin-dialog'
@@ -117,7 +119,19 @@
       appState.zoomReset()
     }
 
-    // Escape - close FindReplace
+    // Alt+Z - toggle word wrap
+    if (e.altKey && e.key === 'z') {
+      e.preventDefault()
+      settingsStore.wordWrap = !settingsStore.wordWrap
+      settingsStore.debouncedSave()
+    }
+
+    // Escape - close Settings or FindReplace
+    if (e.key === 'Escape' && appState.showSettings) {
+      e.preventDefault()
+      appState.showSettings = false
+      return
+    }
     if (e.key === 'Escape' && appState.showFindReplace) {
       e.preventDefault()
       closeFindReplace()
@@ -274,7 +288,10 @@
           editorArea?.getActiveEditor()?.commands.selectAll()
         }
         break
-      case 'toggleWordWrap': break // handled in Step 10
+      case 'toggleWordWrap':
+        settingsStore.wordWrap = !settingsStore.wordWrap
+        settingsStore.debouncedSave()
+        break
       case 'print': window.print(); break
     }
   }
@@ -295,6 +312,9 @@
     />
   {/if}
   <EditorArea bind:this={editorArea} />
+  {#if appState.showSettings}
+    <SettingsPage onclose={() => appState.showSettings = false} />
+  {/if}
   <StatusBar ontoggleSourceView={handleToggleSourceView} />
 </main>
 
@@ -324,5 +344,6 @@
     background-color: var(--bg-base);
     border-radius: 8px;
     overflow: hidden;
+    position: relative;
   }
 </style>

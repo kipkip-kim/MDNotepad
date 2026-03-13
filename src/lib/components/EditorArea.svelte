@@ -4,6 +4,7 @@
   import { createExtensions } from '../editor/extensions'
   import { tabStore } from '../stores/tabs.svelte'
   import { appState } from '../stores/app.svelte'
+  import { settingsStore } from '../stores/settings.svelte'
   import type { SourceEditorExports } from '../types/tab'
   import SourceEditor from './SourceEditor.svelte'
 
@@ -88,6 +89,63 @@
     for (const el of sourceElements.values()) {
       const ta = el.querySelector('textarea') as HTMLElement | null
       if (ta) ta.style.fontSize = `${fontSize}px`
+    }
+  })
+
+  // Apply font family from settings
+  $effect(() => {
+    const fontFamily = settingsStore.editorFontFamily
+    for (const el of editorElements.values()) {
+      const pm = el.querySelector('.ProseMirror') as HTMLElement | null
+      if (pm) pm.style.fontFamily = fontFamily
+    }
+    for (const el of sourceElements.values()) {
+      const ta = el.querySelector('textarea') as HTMLElement | null
+      if (ta) ta.style.fontFamily = fontFamily
+    }
+  })
+
+  // Apply word wrap from settings
+  $effect(() => {
+    const wrap = settingsStore.wordWrap
+    for (const el of editorElements.values()) {
+      const pm = el.querySelector('.ProseMirror') as HTMLElement | null
+      if (pm) {
+        if (wrap) {
+          pm.style.whiteSpace = ''
+          pm.style.overflowX = ''
+        } else {
+          pm.style.whiteSpace = 'pre'
+          pm.style.overflowX = 'auto'
+        }
+      }
+    }
+    for (const el of sourceElements.values()) {
+      const ta = el.querySelector('textarea') as HTMLElement | null
+      if (ta) {
+        if (wrap) {
+          ta.style.whiteSpace = 'pre-wrap'
+          ta.style.wordWrap = 'break-word'
+          ta.style.overflowX = ''
+        } else {
+          ta.style.whiteSpace = 'pre'
+          ta.style.wordWrap = ''
+          ta.style.overflowX = 'auto'
+        }
+      }
+    }
+  })
+
+  // Apply spell check from settings
+  $effect(() => {
+    const spellCheck = settingsStore.spellCheck
+    for (const el of editorElements.values()) {
+      const pm = el.querySelector('.ProseMirror') as HTMLElement | null
+      if (pm) pm.setAttribute('spellcheck', String(spellCheck))
+    }
+    for (const el of sourceElements.values()) {
+      const ta = el.querySelector('textarea') as HTMLElement | null
+      if (ta) ta.setAttribute('spellcheck', String(spellCheck))
     }
   })
 
@@ -207,9 +265,17 @@
       tab.savedContent = md
     }
 
-    // Apply zoom
+    // Apply current settings to newly created editor
     const pm = wrapper.querySelector('.ProseMirror') as HTMLElement | null
-    if (pm) pm.style.fontSize = `${appState.editorFontSize}px`
+    if (pm) {
+      pm.style.fontSize = `${appState.editorFontSize}px`
+      pm.style.fontFamily = settingsStore.editorFontFamily
+      pm.setAttribute('spellcheck', String(settingsStore.spellCheck))
+      if (!settingsStore.wordWrap) {
+        pm.style.whiteSpace = 'pre'
+        pm.style.overflowX = 'auto'
+      }
+    }
 
     editors.set(tabId, editor)
 
@@ -249,6 +315,21 @@
     })
 
     sourceEditors.set(tabId, comp as SourceEditorExports)
+
+    // Apply current settings to newly created source editor
+    const ta = wrapper.querySelector('textarea') as HTMLElement | null
+    if (ta) {
+      ta.style.fontSize = `${appState.editorFontSize}px`
+      ta.style.fontFamily = settingsStore.editorFontFamily
+      ta.setAttribute('spellcheck', String(settingsStore.spellCheck))
+      if (settingsStore.wordWrap) {
+        ta.style.whiteSpace = 'pre-wrap'
+        ta.style.wordWrap = 'break-word'
+      } else {
+        ta.style.whiteSpace = 'pre'
+        ta.style.overflowX = 'auto'
+      }
+    }
   }
 
   function getCursorPosition(editor: Editor): { line: number; col: number } {

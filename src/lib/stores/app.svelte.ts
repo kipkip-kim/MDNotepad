@@ -1,3 +1,5 @@
+import { settingsStore } from './settings.svelte'
+
 class AppState {
   zoomLevel = $state(100)
   showSettings = $state(false)
@@ -17,7 +19,7 @@ class AppState {
   }
 
   get editorFontSize(): number {
-    return 14 * (this.zoomLevel / 100)
+    return settingsStore.editorFontSize * (this.zoomLevel / 100)
   }
 }
 
