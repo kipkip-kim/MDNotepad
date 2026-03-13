@@ -8,7 +8,7 @@
 
   let {
     items = [],
-    selectedIndex = 0,
+    selectedIndex = $bindable(0),
     onselect,
   }: {
     items: CommandItem[]

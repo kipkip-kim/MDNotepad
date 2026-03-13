@@ -9,8 +9,11 @@
   }
 
   function handleCloseTab(id: string) {
-    // Save confirmation will be added in Step 6
-    tabStore.closeTab(id)
+    window.dispatchEvent(
+      new CustomEvent('mdnotepad:command', {
+        detail: { action: 'closeTab', tabId: id },
+      })
+    )
   }
 
   function handleDragStart(e: DragEvent, idx: number) {

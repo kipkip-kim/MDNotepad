@@ -18,13 +18,16 @@ pub fn read_file_with_encoding(path: String) -> Result<FileReadResult, String> {
         });
     }
 
-    // Try UTF-8 first
-    if let Ok(s) = String::from_utf8(bytes.clone()) {
-        return Ok(FileReadResult {
-            content: s,
-            encoding: "UTF-8".into(),
-        });
-    }
+    // Try UTF-8 first (recover bytes on failure to avoid clone)
+    let bytes = match String::from_utf8(bytes) {
+        Ok(s) => {
+            return Ok(FileReadResult {
+                content: s,
+                encoding: "UTF-8".into(),
+            });
+        }
+        Err(e) => e.into_bytes(),
+    };
 
     // Auto-detect encoding with chardetng
     let mut detector = chardetng::EncodingDetector::new();
@@ -63,7 +66,13 @@ pub fn write_file_with_encoding(
         other => {
             let enc = encoding_rs::Encoding::for_label(other.as_bytes())
                 .ok_or_else(|| format!("Unknown encoding: {}", other))?;
-            let (encoded, _, _) = enc.encode(&content);
+            let (encoded, _, had_errors) = enc.encode(&content);
+            if had_errors {
+                return Err(format!(
+                    "Some characters could not be encoded in {}",
+                    other
+                ));
+            }
             encoded.to_vec()
         }
     };
@@ -73,5 +82,13 @@ pub fn write_file_with_encoding(
 
 #[tauri::command]
 pub fn atomic_rename(from: String, to: String) -> Result<(), String> {
+    // On Windows, std::fs::rename fails if destination exists.
+    // Remove destination first if it exists.
+    #[cfg(target_os = "windows")]
+    {
+        if std::path::Path::new(&to).exists() {
+            std::fs::remove_file(&to).map_err(|e| e.to_string())?;
+        }
+    }
     std::fs::rename(&from, &to).map_err(|e| e.to_string())
 }

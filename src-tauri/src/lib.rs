@@ -15,7 +15,8 @@ pub fn run() {
             commands::file_ops::atomic_rename,
         ])
         .setup(|app| {
-            let window = app.get_webview_window("main").unwrap();
+            let window = app.get_webview_window("main")
+                .ok_or("Failed to get main window")?;
 
             #[cfg(target_os = "windows")]
             apply_window_effect(&window);
@@ -33,23 +34,32 @@ fn apply_window_effect(window: &tauri::WebviewWindow) {
     if is_windows_11() {
         let _ = apply_mica(window, None);
     } else {
-        let _ = apply_acrylic(window, Some((18, 18, 18, 125)));
+        // Use a neutral, semi-transparent tint that works for both light and dark themes
+        let _ = apply_acrylic(window, Some((243, 243, 243, 180)));
     }
 }
 
 #[cfg(target_os = "windows")]
 fn is_windows_11() -> bool {
+    // Read build number from registry
+    use std::os::windows::process::CommandExt;
     use std::process::Command;
-    // Use `ver` command to get Windows version, check build >= 22000
-    if let Ok(output) = Command::new("cmd").args(["/C", "ver"]).output() {
-        let version_str = String::from_utf8_lossy(&output.stdout);
-        // Format: "Microsoft Windows [Version 10.0.22621.xxxx]"
-        if let Some(start) = version_str.find("10.0.") {
-            let after = &version_str[start + 5..];
-            if let Some(end) = after.find(|c: char| !c.is_ascii_digit()) {
-                if let Ok(build) = after[..end].parse::<u32>() {
-                    return build >= 22000;
-                }
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    if let Ok(output) = Command::new("reg")
+        .creation_flags(CREATE_NO_WINDOW)
+        .args([
+            "query",
+            r"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion",
+            "/v",
+            "CurrentBuildNumber",
+        ])
+        .output()
+    {
+        let out = String::from_utf8_lossy(&output.stdout);
+        // Output format: "    CurrentBuildNumber    REG_SZ    22621"
+        if let Some(val) = out.split_whitespace().last() {
+            if let Ok(build) = val.parse::<u32>() {
+                return build >= 22000;
             }
         }
     }

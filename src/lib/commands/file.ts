@@ -4,13 +4,13 @@ import { detectLineEnding } from '../editor/markdown-utils'
 import { tabStore } from '../stores/tabs.svelte'
 import type { TabData } from '../types/tab'
 
-export async function handleOpen(editors: Map<string, Editor>) {
+export async function handleOpen() {
   const path = await openFileDialog()
   if (!path) return
-  await handleOpenPath(path, editors)
+  await handleOpenPath(path)
 }
 
-export async function handleOpenPath(path: string, editors: Map<string, Editor>) {
+export async function handleOpenPath(path: string) {
   // Check if file is already open
   const existing = tabStore.findTabByPath(path)
   if (existing) {
@@ -39,7 +39,7 @@ export async function handleSave(tab: TabData, editors: Map<string, Editor>) {
     const content = getContentForSave(tab, editors)
     await writeFile(tab.filePath, content, tab.encoding, tab.lineEnding)
     tabStore.updateContent(tab.id, content)
-    tabStore.markSaved(tab.id)
+    tabStore.markSaved(tab.id, content)
   } else {
     await handleSaveAs(tab, editors)
   }
@@ -61,5 +61,5 @@ export async function handleSaveAs(tab: TabData, editors: Map<string, Editor>) {
   await writeFile(path, content, tab.encoding, tab.lineEnding)
   tabStore.updateTabFilePath(tab.id, path, isMarkdown)
   tabStore.updateContent(tab.id, content)
-  tabStore.markSaved(tab.id)
+  tabStore.markSaved(tab.id, content)
 }

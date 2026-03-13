@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, onDestroy } from 'svelte'
   import { Editor } from '@tiptap/core'
   import { createExtensions } from '../editor/extensions'
   import { tabStore } from '../stores/tabs.svelte'
@@ -35,6 +35,12 @@
       editors.get(tab.id)?.commands.focus()
     }
 
+    // Update character count for the active tab
+    const editor = editors.get(tab.id)
+    if (editor) {
+      appState.characterCount = editor.storage.characterCount.characters()
+    }
+
     activeEditorId = tab.id
   })
 
@@ -59,6 +65,14 @@
         editorElements.delete(id)
       }
     }
+  })
+
+  onDestroy(() => {
+    for (const editor of editors.values()) {
+      editor.destroy()
+    }
+    editors.clear()
+    editorElements.clear()
   })
 
   function createEditorForTab(tabId: string, content: string, isMarkdown: boolean) {
@@ -89,15 +103,15 @@
       },
     })
 
-    // Set content
+    // Set content (emitUpdate=false to prevent triggering onUpdate during init)
     if (isMarkdown && content) {
-      editor.commands.setContent(content)
+      editor.commands.setContent(content, false)
     } else if (!isMarkdown && content) {
       const html = content
         .split('\n')
         .map((line) => `<p>${escapeHtml(line) || '<br>'}</p>`)
         .join('')
-      editor.commands.setContent(html)
+      editor.commands.setContent(html, false)
     }
 
     // Mark as saved content (initial load shouldn't be dirty)
@@ -122,12 +136,23 @@
 
   function getCursorPosition(editor: Editor): { line: number; col: number } {
     const { from } = editor.state.selection
-    const text = editor.state.doc.textBetween(0, from, '\n')
-    const lines = text.split('\n')
-    return {
-      line: lines.length,
-      col: lines[lines.length - 1].length + 1,
-    }
+    let line = 0
+    let col = 1
+
+    editor.state.doc.descendants((node, pos) => {
+      if (node.isTextblock) {
+        line++
+        const contentStart = pos + 1
+        const contentEnd = pos + node.nodeSize - 1
+        if (from >= contentStart && from <= contentEnd) {
+          col = from - contentStart + 1
+          return false
+        }
+      }
+      return true
+    })
+
+    return { line: Math.max(1, line), col }
   }
 
   function escapeHtml(text: string): string {

@@ -8,6 +8,15 @@
   import { appState } from './lib/stores/app.svelte'
   import { handleOpen, handleSave, handleSaveAs, handleOpenPath } from './lib/commands/file'
   import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
+  import { ask, message } from '@tauri-apps/plugin-dialog'
+
+  async function safeAsync(fn: () => Promise<void>) {
+    try {
+      await fn()
+    } catch (err) {
+      await message(String(err), { title: 'MDNotepad', kind: 'error' })
+    }
+  }
 
   let editorArea: EditorArea | undefined = $state()
 
@@ -22,17 +31,41 @@
     const appWindow = getCurrentWebviewWindow()
     const unlisten = appWindow.onDragDropEvent((event) => {
       if (event.payload.type === 'drop') {
-        const editors = editorArea?.getEditors()
-        if (!editors) return
         for (const path of event.payload.paths) {
-          handleOpenPath(path, editors)
+          safeAsync(() => handleOpenPath(path))
         }
       }
+    })
+
+    // Intercept window close to check for unsaved changes
+    const unlistenClose = appWindow.onCloseRequested(async (event) => {
+      const dirtyTabs = tabStore.tabs.filter((t) => tabStore.isTabDirty(t.id))
+      if (dirtyTabs.length === 0) return
+
+      event.preventDefault()
+      const shouldSave = await ask(
+        `You have ${dirtyTabs.length} unsaved file(s). Save before closing?`,
+        { title: 'MDNotepad', kind: 'warning' }
+      )
+      if (shouldSave) {
+        const editors = editorArea?.getEditors()
+        if (editors) {
+          for (const tab of dirtyTabs) {
+            try {
+              await handleSave(tab, editors)
+            } catch {
+              return // Save failed, abort close
+            }
+          }
+        }
+      }
+      await appWindow.destroy()
     })
 
     return () => {
       window.removeEventListener('mdnotepad:command', listener)
       unlisten.then((fn) => fn())
+      unlistenClose.then((fn) => fn())
     }
   })
 
@@ -48,7 +81,7 @@
       tabStore.createTab()
     } else if (ctrl && e.key === 'w') {
       e.preventDefault()
-      if (tabStore.activeTab) tabStore.closeTab(tabStore.activeTab.id)
+      if (tabStore.activeTab) confirmAndCloseTab(tabStore.activeTab.id)
     } else if (ctrl && e.key === 'Tab') {
       e.preventDefault()
       e.shiftKey ? tabStore.prevTab() : tabStore.nextTab()
@@ -57,18 +90,17 @@
     // File operations
     if (ctrl && e.key === 'o') {
       e.preventDefault()
-      const editors = editorArea?.getEditors()
-      if (editors) handleOpen(editors)
+      safeAsync(() => handleOpen())
     } else if (ctrl && e.shiftKey && e.key === 'S') {
       e.preventDefault()
       const tab = tabStore.activeTab
       const editors = editorArea?.getEditors()
-      if (tab && editors) handleSaveAs(tab, editors)
+      if (tab && editors) safeAsync(() => handleSaveAs(tab, editors))
     } else if (ctrl && e.key === 's') {
       e.preventDefault()
       const tab = tabStore.activeTab
       const editors = editorArea?.getEditors()
-      if (tab && editors) handleSave(tab, editors)
+      if (tab && editors) safeAsync(() => handleSave(tab, editors))
     }
 
     // Zoom
@@ -119,30 +151,65 @@
     }
   }
 
+  async function confirmAndCloseTab(id: string) {
+    if (tabStore.isTabDirty(id)) {
+      const tab = tabStore.getTabById(id)
+      if (!tab) return
+
+      const shouldSave = await ask(
+        `Do you want to save changes to "${tab.fileName}"?`,
+        { title: 'MDNotepad', kind: 'warning' }
+      )
+
+      if (shouldSave) {
+        const editors = editorArea?.getEditors()
+        if (editors) {
+          try {
+            await handleSave(tab, editors)
+          } catch {
+            return // Save failed, don't close
+          }
+        }
+      }
+    }
+
+    tabStore.closeTab(id)
+  }
+
   function handleGoToLine() {
     const editor = editorArea?.getActiveEditor()
     if (!editor) return
-    const totalLines = editor.state.doc.textBetween(0, editor.state.doc.content.size, '\n').split('\n').length
+    const doc = editor.state.doc
+
+    // Count textblocks as lines (consistent with getCursorPosition)
+    let totalLines = 0
+    doc.descendants((node) => {
+      if (node.isTextblock) totalLines++
+      return true
+    })
+    if (totalLines === 0) return
+
     const input = prompt(`Go to Line (1-${totalLines}):`, String(tabStore.activeTab?.cursorPosition.line ?? 1))
     if (input === null) return
     let lineNum = parseInt(input, 10)
     if (isNaN(lineNum) || lineNum < 1) lineNum = 1
     if (lineNum > totalLines) lineNum = totalLines
 
-    let pos = 0
-    let currentLine = 1
-    editor.state.doc.descendants((node, nodePos) => {
-      if (currentLine >= lineNum) return false
-      if (node.isBlock) {
+    let currentLine = 0
+    let targetPos = 1
+    doc.descendants((node, pos) => {
+      if (node.isTextblock) {
         currentLine++
-        pos = nodePos + node.nodeSize
+        if (currentLine === lineNum) {
+          targetPos = pos + 1
+          return false
+        }
       }
       return true
     })
-    if (lineNum === 1) pos = 1
 
     editor.commands.focus()
-    editor.commands.setTextSelection(pos)
+    editor.commands.setTextSelection(targetPos)
   }
 
   function handleToggleSourceView() {
@@ -158,10 +225,14 @@
 
     switch (action) {
       case 'newTab': tabStore.createTab(); break
-      case 'open': if (editors) handleOpen(editors); break
-      case 'save': if (tab && editors) handleSave(tab, editors); break
-      case 'saveAs': if (tab && editors) handleSaveAs(tab, editors); break
-      case 'closeTab': if (tab) tabStore.closeTab(tab.id); break
+      case 'open': safeAsync(() => handleOpen()); break
+      case 'save': if (tab && editors) safeAsync(() => handleSave(tab, editors)); break
+      case 'saveAs': if (tab && editors) safeAsync(() => handleSaveAs(tab, editors)); break
+      case 'closeTab': {
+        const closeId = (e.detail as { tabId?: string }).tabId ?? tab?.id
+        if (closeId) confirmAndCloseTab(closeId)
+        break
+      }
       case 'zoomIn': appState.zoomIn(); break
       case 'zoomOut': appState.zoomOut(); break
       case 'zoomReset': appState.zoomReset(); break

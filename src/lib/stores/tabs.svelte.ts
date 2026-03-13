@@ -73,9 +73,9 @@ class TabStore {
     if (tab) tab.content = content
   }
 
-  markSaved(id: string): void {
+  markSaved(id: string, savedContent?: string): void {
     const tab = this.tabs.find((t) => t.id === id)
-    if (tab) tab.savedContent = tab.content
+    if (tab) tab.savedContent = savedContent ?? tab.content
   }
 
   updateTabFilePath(id: string, newPath: string, isMarkdown: boolean): void {
@@ -133,7 +133,10 @@ class TabStore {
 
   /** Check if a file is already open and activate it */
   findTabByPath(filePath: string): TabData | undefined {
-    return this.tabs.find((t) => t.filePath === filePath)
+    const normalized = filePath.replace(/\\/g, '/').toLowerCase()
+    return this.tabs.find(
+      (t) => t.filePath?.replace(/\\/g, '/').toLowerCase() === normalized
+    )
   }
 }
 

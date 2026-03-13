@@ -106,7 +106,7 @@ export const SlashCommands = Extension.create({
           let container: HTMLDivElement | undefined
           let selectedIndex = $state(0)
           let currentItems = $state<SlashCommand[]>([])
-          let currentCommand: ((props: { item: SlashCommand }) => void) | null = null
+          let currentCommand: ((props: SlashCommand) => void) | null = null
 
           return {
             onStart(props: any) {
@@ -128,7 +128,7 @@ export const SlashCommands = Extension.create({
                   selectedIndex,
                   onselect: (item: SlashCommand) => {
                     if (currentCommand) {
-                      currentCommand({ item } as any)
+                      currentCommand(item as any)
                     }
                   },
                 },
@@ -154,7 +154,7 @@ export const SlashCommands = Extension.create({
                     selectedIndex,
                     onselect: (item: SlashCommand) => {
                       if (currentCommand) {
-                        currentCommand({ item } as any)
+                        currentCommand(item as any)
                       }
                     },
                   },
@@ -166,11 +166,13 @@ export const SlashCommands = Extension.create({
               const { event } = props
 
               if (event.key === 'ArrowUp') {
+                if (currentItems.length === 0) return true
                 selectedIndex = (selectedIndex - 1 + currentItems.length) % currentItems.length
                 updateComponent()
                 return true
               }
               if (event.key === 'ArrowDown') {
+                if (currentItems.length === 0) return true
                 selectedIndex = (selectedIndex + 1) % currentItems.length
                 updateComponent()
                 return true
@@ -178,7 +180,7 @@ export const SlashCommands = Extension.create({
               if (event.key === 'Enter') {
                 const item = currentItems[selectedIndex]
                 if (item && currentCommand) {
-                  currentCommand({ item } as any)
+                  currentCommand(item as any)
                 }
                 return true
               }
@@ -197,7 +199,7 @@ export const SlashCommands = Extension.create({
                       selectedIndex,
                       onselect: (item: SlashCommand) => {
                         if (currentCommand) {
-                          currentCommand({ item } as any)
+                          currentCommand(item as any)
                         }
                       },
                     },
