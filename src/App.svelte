@@ -2,6 +2,7 @@
   import TitleBar from './lib/components/TitleBar.svelte'
   import TabBar from './lib/components/TabBar.svelte'
   import EditorArea from './lib/components/EditorArea.svelte'
+  import FindReplace from './lib/components/FindReplace.svelte'
   import StatusBar from './lib/components/StatusBar.svelte'
   import { onMount } from 'svelte'
   import { tabStore } from './lib/stores/tabs.svelte'
@@ -19,6 +20,7 @@
   }
 
   let editorArea: EditorArea | undefined = $state()
+  let findReplaceRef: FindReplace | undefined = $state()
 
   onMount(() => {
     // Custom command events from menus
@@ -115,6 +117,13 @@
       appState.zoomReset()
     }
 
+    // Escape - close FindReplace
+    if (e.key === 'Escape' && appState.showFindReplace) {
+      e.preventDefault()
+      closeFindReplace()
+      return
+    }
+
     // Find/Replace
     if (ctrl && e.key === 'f') {
       e.preventDefault()
@@ -177,16 +186,8 @@
   }
 
   function handleGoToLine() {
-    const editor = editorArea?.getActiveEditor()
-    if (!editor) return
-    const doc = editor.state.doc
-
-    // Count textblocks as lines (consistent with getCursorPosition)
-    let totalLines = 0
-    doc.descendants((node) => {
-      if (node.isTextblock) totalLines++
-      return true
-    })
+    if (!editorArea) return
+    const totalLines = editorArea.getLineCount()
     if (totalLines === 0) return
 
     const input = prompt(`Go to Line (1-${totalLines}):`, String(tabStore.activeTab?.cursorPosition.line ?? 1))
@@ -195,21 +196,23 @@
     if (isNaN(lineNum) || lineNum < 1) lineNum = 1
     if (lineNum > totalLines) lineNum = totalLines
 
-    let currentLine = 0
-    let targetPos = 1
-    doc.descendants((node, pos) => {
-      if (node.isTextblock) {
-        currentLine++
-        if (currentLine === lineNum) {
-          targetPos = pos + 1
-          return false
-        }
-      }
-      return true
-    })
+    editorArea.goToLine(lineNum)
+  }
 
-    editor.commands.focus()
-    editor.commands.setTextSelection(targetPos)
+  function closeFindReplace() {
+    // Clear search decorations before destroying the component
+    findReplaceRef?.clearSearchDecorations()
+    // Also clear directly in case ref is unavailable (e.g., Escape from editor)
+    editorArea?.getActiveEditor()?.commands.clearSearch()
+
+    appState.showFindReplace = false
+    // Focus back to editor
+    const tab = tabStore.activeTab
+    if (tab?.viewMode === 'source') {
+      editorArea?.getSourceEditor(tab.id)?.focus()
+    } else {
+      editorArea?.getActiveEditor()?.commands.focus()
+    }
   }
 
   function handleToggleSourceView() {
@@ -247,9 +250,30 @@
         appState.findReplaceMode = 'replace'
         break
       case 'goToLine': handleGoToLine(); break
-      case 'undo': editorArea?.getActiveEditor()?.commands.undo(); break
-      case 'redo': editorArea?.getActiveEditor()?.commands.redo(); break
-      case 'selectAll': editorArea?.getActiveEditor()?.commands.selectAll(); break
+      case 'undo':
+        if (tab?.viewMode === 'source') {
+          editorArea?.getSourceEditor(tab.id)?.focus()
+          document.execCommand('undo')
+        } else {
+          editorArea?.getActiveEditor()?.commands.undo()
+        }
+        break
+      case 'redo':
+        if (tab?.viewMode === 'source') {
+          editorArea?.getSourceEditor(tab.id)?.focus()
+          document.execCommand('redo')
+        } else {
+          editorArea?.getActiveEditor()?.commands.redo()
+        }
+        break
+      case 'selectAll':
+        if (tab?.viewMode === 'source') {
+          editorArea?.getSourceEditor(tab.id)?.focus()
+          document.execCommand('selectAll')
+        } else {
+          editorArea?.getActiveEditor()?.commands.selectAll()
+        }
+        break
       case 'toggleWordWrap': break // handled in Step 10
       case 'print': window.print(); break
     }
@@ -261,6 +285,15 @@
 <main class="app-root">
   <TitleBar title={activeFileName} {isDirty} />
   <TabBar />
+  {#if appState.showFindReplace}
+    <FindReplace
+      bind:this={findReplaceRef}
+      mode={appState.findReplaceMode}
+      getActiveEditor={() => editorArea?.getActiveEditor()}
+      getSourceEditor={(tabId) => editorArea?.getSourceEditor(tabId)}
+      onclose={closeFindReplace}
+    />
+  {/if}
   <EditorArea bind:this={editorArea} />
   <StatusBar ontoggleSourceView={handleToggleSourceView} />
 </main>

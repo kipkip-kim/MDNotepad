@@ -25,6 +25,10 @@ export async function handleOpenPath(path: string) {
 }
 
 function getContentForSave(tab: TabData, editors: Map<string, Editor>): string {
+  // In source mode, tab.content is always up-to-date from the textarea
+  if (tab.viewMode === 'source') {
+    return tab.content
+  }
   const editor = editors.get(tab.id)
   if (!editor) return tab.content
   if (tab.isMarkdown) {
@@ -50,12 +54,16 @@ export async function handleSaveAs(tab: TabData, editors: Map<string, Editor>) {
   if (!path) return
   const isMarkdown = /\.(md|markdown)$/i.test(path)
 
-  const editor = editors.get(tab.id)
   let content: string
-  if (editor) {
-    content = isMarkdown ? editor.storage.markdown.getMarkdown() : editor.getText()
-  } else {
+  if (tab.viewMode === 'source') {
     content = tab.content
+  } else {
+    const editor = editors.get(tab.id)
+    if (editor) {
+      content = isMarkdown ? editor.storage.markdown.getMarkdown() : editor.getText()
+    } else {
+      content = tab.content
+    }
   }
 
   await writeFile(path, content, tab.encoding, tab.lineEnding)

@@ -16,6 +16,7 @@ import CharacterCount from '@tiptap/extension-character-count'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import { common, createLowlight } from 'lowlight'
 import { SlashCommands } from './slash-commands.svelte'
+import { SearchHighlight } from './search-highlight'
 import type { Extensions } from '@tiptap/core'
 
 const lowlight = createLowlight(common)
@@ -50,6 +51,7 @@ export function createExtensions(extraExtensions: Extensions = []): Extensions {
     CharacterCount,
     CodeBlockLowlight.configure({ lowlight }),
     SlashCommands,
+    SearchHighlight,
     ...extraExtensions,
   ]
 }
