@@ -5,11 +5,14 @@
   import FindReplace from './lib/components/FindReplace.svelte'
   import SettingsPage from './lib/components/SettingsPage.svelte'
   import StatusBar from './lib/components/StatusBar.svelte'
+  import ContextMenu from './lib/components/ContextMenu.svelte'
   import { onMount } from 'svelte'
   import { tabStore } from './lib/stores/tabs.svelte'
   import { appState } from './lib/stores/app.svelte'
   import { settingsStore } from './lib/stores/settings.svelte'
   import { handleOpen, handleSave, handleSaveAs, handleOpenPath } from './lib/commands/file'
+  import { saveSession } from './lib/services/session'
+  import { startAutoSave, stopAutoSave } from './lib/services/auto-save'
   import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
   import { ask, message } from '@tauri-apps/plugin-dialog'
 
@@ -23,6 +26,7 @@
 
   let editorArea: EditorArea | undefined = $state()
   let findReplaceRef: FindReplace | undefined = $state()
+  let contextMenu: { x: number; y: number } | null = $state(null)
 
   onMount(() => {
     // Custom command events from menus
@@ -30,6 +34,9 @@
       handleCommand(e)
     }) as EventListener
     window.addEventListener('mdnotepad:command', listener)
+
+    // Start auto-save
+    startAutoSave(() => editorArea?.getEditors())
 
     // File drag and drop
     const appWindow = getCurrentWebviewWindow()
@@ -44,30 +51,39 @@
     // Intercept window close to check for unsaved changes
     const unlistenClose = appWindow.onCloseRequested(async (event) => {
       const dirtyTabs = tabStore.tabs.filter((t) => tabStore.isTabDirty(t.id))
-      if (dirtyTabs.length === 0) return
 
-      event.preventDefault()
-      const shouldSave = await ask(
-        `You have ${dirtyTabs.length} unsaved file(s). Save before closing?`,
-        { title: 'MDNotepad', kind: 'warning' }
-      )
-      if (shouldSave) {
-        const editors = editorArea?.getEditors()
-        if (editors) {
-          for (const tab of dirtyTabs) {
-            try {
-              await handleSave(tab, editors)
-            } catch {
-              return // Save failed, abort close
+      if (dirtyTabs.length > 0) {
+        event.preventDefault()
+        const shouldSave = await ask(
+          `You have ${dirtyTabs.length} unsaved file(s). Save before closing?`,
+          { title: 'MDNotepad', kind: 'warning' }
+        )
+        if (shouldSave) {
+          const editors = editorArea?.getEditors()
+          if (editors) {
+            for (const tab of dirtyTabs) {
+              try {
+                await handleSave(tab, editors)
+              } catch {
+                return // Save failed, abort close
+              }
             }
           }
         }
       }
+
+      // Save session before closing
+      const editors = editorArea?.getEditors()
+      if (editors) {
+        await saveSession(editors)
+      }
+
       await appWindow.destroy()
     })
 
     return () => {
       window.removeEventListener('mdnotepad:command', listener)
+      stopAutoSave()
       unlisten.then((fn) => fn())
       unlistenClose.then((fn) => fn())
     }
@@ -161,6 +177,12 @@
       handleGoToLine()
     }
 
+    // Print
+    if (ctrl && e.key === 'p') {
+      e.preventDefault()
+      window.print()
+    }
+
     // Source view toggle
     if (ctrl && e.key === '/') {
       e.preventDefault()
@@ -235,6 +257,73 @@
     tabStore.setViewMode(tab.id, tab.viewMode === 'wysiwyg' ? 'source' : 'wysiwyg')
   }
 
+  function handleContextMenu(e: MouseEvent) {
+    const target = e.target as HTMLElement
+    if (!target.closest('.editor-area')) return
+    e.preventDefault()
+    contextMenu = { x: e.clientX, y: e.clientY }
+  }
+
+  function getContextMenuItems() {
+    const tab = tabStore.activeTab
+    const isSource = tab?.viewMode === 'source'
+
+    const items: { label: string; action: () => void; separator?: boolean; disabled?: boolean }[] = [
+      {
+        label: 'Undo',
+        action: () => {
+          if (isSource) {
+            editorArea?.getSourceEditor(tab!.id)?.focus()
+            document.execCommand('undo')
+          } else {
+            editorArea?.getActiveEditor()?.commands.undo()
+          }
+        },
+      },
+      {
+        label: 'Redo',
+        action: () => {
+          if (isSource) {
+            editorArea?.getSourceEditor(tab!.id)?.focus()
+            document.execCommand('redo')
+          } else {
+            editorArea?.getActiveEditor()?.commands.redo()
+          }
+        },
+      },
+      { label: '', action: () => {}, separator: true },
+      { label: 'Cut', action: () => document.execCommand('cut') },
+      { label: 'Copy', action: () => document.execCommand('copy') },
+      { label: 'Paste', action: () => document.execCommand('paste') },
+      { label: '', action: () => {}, separator: true },
+      {
+        label: 'Select All',
+        action: () => {
+          if (isSource) {
+            editorArea?.getSourceEditor(tab!.id)?.focus()
+            document.execCommand('selectAll')
+          } else {
+            editorArea?.getActiveEditor()?.commands.selectAll()
+          }
+        },
+      },
+    ]
+
+    // Add formatting options for markdown tabs in WYSIWYG mode
+    if (tab?.isMarkdown && !isSource) {
+      const editor = editorArea?.getActiveEditor()
+      if (editor) {
+        items.push({ label: '', action: () => {}, separator: true })
+        items.push({ label: 'Bold', action: () => editor.chain().focus().toggleBold().run() })
+        items.push({ label: 'Italic', action: () => editor.chain().focus().toggleItalic().run() })
+        items.push({ label: 'Strikethrough', action: () => editor.chain().focus().toggleStrike().run() })
+        items.push({ label: 'Code', action: () => editor.chain().focus().toggleCode().run() })
+      }
+    }
+
+    return items
+  }
+
   function handleCommand(e: CustomEvent<{ action: string }>) {
     const { action } = e.detail
     const editors = editorArea?.getEditors()
@@ -297,7 +386,8 @@
   }
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<svelte:window onkeydown={handleKeydown} oncontextmenu={handleContextMenu} />
 
 <main class="app-root">
   <TitleBar title={activeFileName} {isDirty} />
@@ -316,6 +406,14 @@
     <SettingsPage onclose={() => appState.showSettings = false} />
   {/if}
   <StatusBar ontoggleSourceView={handleToggleSourceView} />
+  {#if contextMenu}
+    <ContextMenu
+      items={getContextMenuItems()}
+      x={contextMenu.x}
+      y={contextMenu.y}
+      onclose={() => contextMenu = null}
+    />
+  {/if}
 </main>
 
 <style>

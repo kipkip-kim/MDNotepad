@@ -2,6 +2,7 @@ import type { Editor } from '@tiptap/core'
 import { openFileDialog, saveFileDialog, readFile, writeFile } from '../services/file-service'
 import { detectLineEnding } from '../editor/markdown-utils'
 import { tabStore } from '../stores/tabs.svelte'
+import { markManualSaveStart, markManualSaveEnd } from '../services/auto-save'
 import type { TabData } from '../types/tab'
 
 export async function handleOpen() {
@@ -40,10 +41,15 @@ function getContentForSave(tab: TabData, editors: Map<string, Editor>): string {
 
 export async function handleSave(tab: TabData, editors: Map<string, Editor>) {
   if (tab.filePath) {
-    const content = getContentForSave(tab, editors)
-    await writeFile(tab.filePath, content, tab.encoding, tab.lineEnding)
-    tabStore.updateContent(tab.id, content)
-    tabStore.markSaved(tab.id, content)
+    markManualSaveStart(tab.id)
+    try {
+      const content = getContentForSave(tab, editors)
+      await writeFile(tab.filePath, content, tab.encoding, tab.lineEnding)
+      tabStore.updateContent(tab.id, content)
+      tabStore.markSaved(tab.id, content)
+    } finally {
+      markManualSaveEnd(tab.id)
+    }
   } else {
     await handleSaveAs(tab, editors)
   }

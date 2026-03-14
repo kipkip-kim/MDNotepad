@@ -151,6 +151,17 @@
 </div>
 
 <style>
+  @keyframes settingsSlideIn {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
   .settings-overlay {
     position: absolute;
     inset: 0;
@@ -159,6 +170,7 @@
     display: flex;
     justify-content: center;
     overflow-y: auto;
+    animation: settingsSlideIn 0.2s ease;
   }
 
   .settings-page {

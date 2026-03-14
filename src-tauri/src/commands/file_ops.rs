@@ -1,4 +1,5 @@
 use serde::Serialize;
+use std::path::Path;
 
 #[derive(Serialize)]
 pub struct FileReadResult {
@@ -6,9 +7,60 @@ pub struct FileReadResult {
     encoding: String,
 }
 
+/// Validate and canonicalize a file path to prevent path traversal attacks.
+/// Blocks device paths, system directories, and executable extensions.
+fn validate_file_path(path: &str) -> Result<std::path::PathBuf, String> {
+    // Block device paths (Windows: \\.\, \\?\, CON, NUL, etc.)
+    let upper = path.to_uppercase();
+    if upper.starts_with("\\\\.\\") || upper.starts_with("\\\\?\\") {
+        return Err("Device paths are not allowed".into());
+    }
+
+    // Block Windows reserved device names
+    let file_stem = Path::new(path)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_uppercase();
+    const RESERVED: &[&str] = &[
+        "CON", "PRN", "AUX", "NUL",
+        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    ];
+    if RESERVED.contains(&file_stem.as_str()) {
+        return Err("Reserved device names are not allowed".into());
+    }
+
+    // Canonicalize to resolve .. and symlinks
+    let canonical = std::fs::canonicalize(Path::new(path).parent().unwrap_or(Path::new(path)))
+        .map_err(|e| format!("Invalid path: {}", e))?;
+    let canonical = if Path::new(path).file_name().is_some() {
+        canonical.join(Path::new(path).file_name().unwrap())
+    } else {
+        canonical
+    };
+
+    // Block dangerous file extensions for write operations
+    let ext = canonical
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    const BLOCKED_EXTS: &[&str] = &[
+        "exe", "dll", "sys", "drv", "bat", "cmd", "ps1", "vbs", "js",
+        "msi", "scr", "com", "pif", "reg",
+    ];
+    if BLOCKED_EXTS.contains(&ext.as_str()) {
+        return Err(format!("File type .{} is not allowed", ext));
+    }
+
+    Ok(canonical)
+}
+
 #[tauri::command]
 pub fn read_file_with_encoding(path: String) -> Result<FileReadResult, String> {
-    let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
+    let validated = validate_file_path(&path)?;
+    let bytes = std::fs::read(&validated).map_err(|e| e.to_string())?;
 
     // BOM detection
     if bytes.starts_with(&[0xEF, 0xBB, 0xBF]) {
@@ -77,18 +129,78 @@ pub fn write_file_with_encoding(
         }
     };
 
-    std::fs::write(&path, bytes).map_err(|e| e.to_string())
+    // Validate: for new files, canonicalize parent then join filename
+    let p = Path::new(&path);
+    let parent = p.parent().ok_or("Invalid file path")?;
+    let parent_canonical = std::fs::canonicalize(parent)
+        .map_err(|e| format!("Invalid path: {}", e))?;
+    let validated = if let Some(fname) = p.file_name() {
+        parent_canonical.join(fname)
+    } else {
+        return Err("Invalid file path".into());
+    };
+
+    // Check extension
+    let ext = validated
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    const BLOCKED_EXTS: &[&str] = &[
+        "exe", "dll", "sys", "drv", "bat", "cmd", "ps1", "vbs", "js",
+        "msi", "scr", "com", "pif", "reg",
+    ];
+    if BLOCKED_EXTS.contains(&ext.as_str()) {
+        return Err(format!("File type .{} is not allowed", ext));
+    }
+
+    std::fs::write(&validated, bytes).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn is_portable() -> bool {
+    let exe = match std::env::current_exe() {
+        Ok(p) => p,
+        Err(_) => return false,
+    };
+    let dir = match exe.parent() {
+        Some(d) => d,
+        None => return false,
+    };
+    dir.join("portable").exists()
+}
+
+#[tauri::command]
+pub fn get_portable_dir() -> Result<String, String> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let dir = exe.parent().ok_or("No parent directory")?;
+    let data_dir = dir.join("data");
+    if !data_dir.exists() {
+        std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
+    }
+    Ok(data_dir.to_string_lossy().to_string())
 }
 
 #[tauri::command]
 pub fn atomic_rename(from: String, to: String) -> Result<(), String> {
+    let from_validated = validate_file_path(&from)?;
+    let to_path = Path::new(&to);
+    let to_parent = to_path.parent().ok_or("Invalid destination path")?;
+    let to_parent_canonical = std::fs::canonicalize(to_parent)
+        .map_err(|e| format!("Invalid destination path: {}", e))?;
+    let to_validated = if let Some(fname) = to_path.file_name() {
+        to_parent_canonical.join(fname)
+    } else {
+        return Err("Invalid destination path".into());
+    };
+
     // On Windows, std::fs::rename fails if destination exists.
     // Remove destination first if it exists.
     #[cfg(target_os = "windows")]
     {
-        if std::path::Path::new(&to).exists() {
-            std::fs::remove_file(&to).map_err(|e| e.to_string())?;
+        if to_validated.exists() {
+            std::fs::remove_file(&to_validated).map_err(|e| e.to_string())?;
         }
     }
-    std::fs::rename(&from, &to).map_err(|e| e.to_string())
+    std::fs::rename(&from_validated, &to_validated).map_err(|e| e.to_string())
 }

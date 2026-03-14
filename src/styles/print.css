@@ -1,0 +1,95 @@
+@media print {
+  @page {
+    margin: 2cm;
+  }
+
+  /* Hide all chrome */
+  .titlebar,
+  .tab-bar,
+  .statusbar,
+  .find-replace-bar,
+  .settings-overlay,
+  .context-menu {
+    display: none !important;
+  }
+
+  /* Reset app layout */
+  .app-root {
+    background: white !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Editor area: remove margins and borders */
+  .editor-area {
+    margin: 0 !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+    background: white !important;
+  }
+
+  /* Show only active editor content */
+  .editor-area .editor-instance,
+  .editor-area .source-instance {
+    overflow: visible !important;
+  }
+
+  /* ProseMirror content styling for print */
+  .ProseMirror {
+    color: black !important;
+    background: white !important;
+    font-size: 12pt !important;
+    padding: 0 !important;
+    min-height: auto !important;
+  }
+
+  /* Source editor (textarea) */
+  .editor-area textarea {
+    color: black !important;
+    background: white !important;
+    border: none !important;
+    font-size: 12pt !important;
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  /* Links: show URL */
+  .ProseMirror a::after {
+    content: " (" attr(href) ")";
+    font-size: 10pt;
+    color: #666;
+  }
+
+  /* Remove search highlights */
+  .search-result,
+  .search-result-current {
+    background: none !important;
+    color: inherit !important;
+  }
+
+  /* Code blocks */
+  .ProseMirror pre {
+    background: #f5f5f5 !important;
+    border: 1px solid #ddd !important;
+    page-break-inside: avoid;
+  }
+
+  /* Tables */
+  .ProseMirror table {
+    page-break-inside: avoid;
+  }
+
+  /* Headings */
+  .ProseMirror h1,
+  .ProseMirror h2,
+  .ProseMirror h3 {
+    color: black !important;
+    page-break-after: avoid;
+  }
+
+  /* Images */
+  .ProseMirror img {
+    max-width: 100% !important;
+    page-break-inside: avoid;
+  }
+}

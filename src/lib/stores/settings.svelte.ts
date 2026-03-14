@@ -1,4 +1,4 @@
-import { load } from '@tauri-apps/plugin-store'
+import { loadStore } from '../services/portable'
 
 export type ThemeMode = 'light' | 'dark' | 'system'
 
@@ -18,7 +18,7 @@ class SettingsStore {
 
   async load() {
     try {
-      const store = await load('settings.json')
+      const store = await loadStore('settings.json')
       const theme = await store.get<ThemeMode>('theme')
       const wordWrap = await store.get<boolean>('wordWrap')
       const fontFamily = await store.get<string>('editorFontFamily')
@@ -46,7 +46,7 @@ class SettingsStore {
     }
     this._saving = true
     try {
-      const store = await load('settings.json')
+      const store = await loadStore('settings.json')
       await store.set('theme', this.theme)
       await store.set('wordWrap', this.wordWrap)
       await store.set('editorFontFamily', this.editorFontFamily)

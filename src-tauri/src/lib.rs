@@ -13,6 +13,8 @@ pub fn run() {
             commands::file_ops::read_file_with_encoding,
             commands::file_ops::write_file_with_encoding,
             commands::file_ops::atomic_rename,
+            commands::file_ops::is_portable,
+            commands::file_ops::get_portable_dir,
         ])
         .setup(|app| {
             let window = app.get_webview_window("main")

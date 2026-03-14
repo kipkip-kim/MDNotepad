@@ -376,6 +376,17 @@
 </div>
 
 <style>
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
   .find-replace-bar {
     display: flex;
     flex-direction: column;
@@ -385,6 +396,7 @@
     border-bottom: 1px solid var(--border);
     margin: 0 8px;
     z-index: 10;
+    animation: slideDown 0.15s ease;
   }
 
   .find-row,

@@ -51,6 +51,11 @@
       const el = sourceElements.get(tab.id)
       if (el) {
         el.style.display = 'block'
+        // Restore scroll position
+        if (tab.scrollTop > 0) {
+          const ta = el.querySelector('textarea') as HTMLElement | null
+          if (ta) ta.scrollTop = tab.scrollTop
+        }
       }
       // Update char count from source
       const srcEditor = sourceEditors.get(tab.id)
@@ -67,6 +72,10 @@
       const el = editorElements.get(tab.id)
       if (el) {
         el.style.display = 'block'
+        // Restore scroll position
+        if (tab.scrollTop > 0) {
+          el.scrollTop = tab.scrollTop
+        }
         editors.get(tab.id)?.commands.focus()
       }
       // Update char count from TipTap
@@ -228,6 +237,11 @@
     container.appendChild(wrapper)
     editorElements.set(tabId, wrapper)
 
+    // Track scroll position
+    wrapper.addEventListener('scroll', () => {
+      tabStore.updateScrollTop(tabId, wrapper.scrollTop)
+    })
+
     const editor = new Editor({
       element: wrapper,
       extensions: createExtensions(),
@@ -258,12 +272,10 @@
     }
 
     // Mark as saved content (initial load shouldn't be dirty)
-    const tab = tabStore.getTabById(tabId)
-    if (tab) {
-      const md = editor.storage.markdown.getMarkdown()
-      tab.content = md
-      tab.savedContent = md
-    }
+    // Use store API instead of direct $state mutation to avoid cascading effects
+    const md = editor.storage.markdown.getMarkdown()
+    tabStore.updateContent(tabId, md)
+    tabStore.markSaved(tabId, md)
 
     // Apply current settings to newly created editor
     const pm = wrapper.querySelector('.ProseMirror') as HTMLElement | null
@@ -329,6 +341,11 @@
         ta.style.whiteSpace = 'pre'
         ta.style.overflowX = 'auto'
       }
+
+      // Track scroll position
+      ta.addEventListener('scroll', () => {
+        tabStore.updateScrollTop(tabId, ta.scrollTop)
+      })
     }
   }
 

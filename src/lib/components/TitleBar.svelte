@@ -31,7 +31,7 @@
         { label: 'Save', shortcut: 'Ctrl+S', action: () => dispatch('save') },
         { label: 'Save As...', shortcut: 'Ctrl+Shift+S', action: () => dispatch('saveAs') },
         { label: '', separator: true },
-        { label: 'Print', shortcut: 'Ctrl+P', action: () => dispatch('print'), disabled: true },
+        { label: 'Print', shortcut: 'Ctrl+P', action: () => dispatch('print') },
         { label: '', separator: true },
         { label: 'Close Tab', shortcut: 'Ctrl+W', action: () => dispatch('closeTab') },
         { label: 'Exit', shortcut: 'Alt+F4', action: () => appWindow.close() },
