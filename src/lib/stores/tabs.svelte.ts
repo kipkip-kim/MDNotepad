@@ -13,6 +13,10 @@ class TabStore {
     return tab ? tab.content !== tab.savedContent : false
   }
 
+  get isAnyDirty(): boolean {
+    return this.tabs.some((t) => t.content !== t.savedContent)
+  }
+
   constructor() {
     // Start with one empty tab
     this.createTab()

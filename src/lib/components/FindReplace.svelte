@@ -228,7 +228,8 @@
       })
       .run()
 
-    wysiwygSearchVersion++
+    // Re-search to update match positions after document changed
+    performWysiwygSearch()
   }
 
   function replaceSourceCurrent() {
@@ -273,7 +274,8 @@
     }
     editor.view.dispatch(tr)
 
-    wysiwygSearchVersion++
+    // Re-search to update match positions after document changed
+    performWysiwygSearch()
   }
 
   function replaceAllSource() {
@@ -282,6 +284,9 @@
     const srcEditor = getSourceEditor(tab.id)
     if (!srcEditor) return
 
+    const textarea = getSourceTextarea()
+    if (!textarea) return
+
     const content = srcEditor.getContent()
     let newContent: string
     if (caseSensitive) {
@@ -289,7 +294,11 @@
     } else {
       newContent = content.replace(new RegExp(escapeRegex(searchTerm), 'gi'), replaceTerm)
     }
-    srcEditor.setContent(newContent)
+
+    // Use selectAll + insertText for undo support
+    textarea.focus()
+    textarea.select()
+    document.execCommand('insertText', false, newContent)
     tabStore.updateContent(tab.id, newContent)
 
     // Re-search

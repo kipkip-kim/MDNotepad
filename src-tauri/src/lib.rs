@@ -36,8 +36,8 @@ fn apply_window_effect(window: &tauri::WebviewWindow) {
     if is_windows_11() {
         let _ = apply_mica(window, None);
     } else {
-        // Use a neutral, semi-transparent tint that works for both light and dark themes
-        let _ = apply_acrylic(window, Some((243, 243, 243, 180)));
+        // Use a highly transparent tint so both light and dark themes show through
+        let _ = apply_acrylic(window, Some((128, 128, 128, 40)));
     }
 }
 

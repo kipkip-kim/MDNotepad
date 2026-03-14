@@ -60,13 +60,12 @@
         )
         if (shouldSave) {
           const editors = editorArea?.getEditors()
-          if (editors) {
-            for (const tab of dirtyTabs) {
-              try {
-                await handleSave(tab, editors)
-              } catch {
-                return // Save failed, abort close
-              }
+          if (!editors) return // Cannot save without editors, abort close
+          for (const tab of dirtyTabs) {
+            try {
+              await handleSave(tab, editors)
+            } catch {
+              return // Save failed, abort close
             }
           }
         }
@@ -294,7 +293,23 @@
       { label: '', action: () => {}, separator: true },
       { label: 'Cut', action: () => document.execCommand('cut') },
       { label: 'Copy', action: () => document.execCommand('copy') },
-      { label: 'Paste', action: () => document.execCommand('paste') },
+      {
+        label: 'Paste',
+        action: async () => {
+          try {
+            const text = await navigator.clipboard.readText()
+            const tab = tabStore.activeTab
+            if (tab?.viewMode === 'source') {
+              document.execCommand('insertText', false, text)
+            } else {
+              editorArea?.getActiveEditor()?.chain().focus().insertContent(text).run()
+            }
+          } catch {
+            // Fallback for older webviews
+            document.execCommand('paste')
+          }
+        },
+      },
       { label: '', action: () => {}, separator: true },
       {
         label: 'Select All',

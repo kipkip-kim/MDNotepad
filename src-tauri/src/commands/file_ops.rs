@@ -194,13 +194,28 @@ pub fn atomic_rename(from: String, to: String) -> Result<(), String> {
         return Err("Invalid destination path".into());
     };
 
-    // On Windows, std::fs::rename fails if destination exists.
-    // Remove destination first if it exists.
+    // On Windows, use MoveFileExW with MOVEFILE_REPLACE_EXISTING for atomic rename
     #[cfg(target_os = "windows")]
     {
-        if to_validated.exists() {
-            std::fs::remove_file(&to_validated).map_err(|e| e.to_string())?;
+        use std::os::windows::ffi::OsStrExt;
+        let from_wide: Vec<u16> = from_validated.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+        let to_wide: Vec<u16> = to_validated.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+
+        // MOVEFILE_REPLACE_EXISTING = 0x1
+        let result = unsafe {
+            windows_sys::Win32::Storage::FileSystem::MoveFileExW(
+                from_wide.as_ptr(),
+                to_wide.as_ptr(),
+                0x1, // MOVEFILE_REPLACE_EXISTING
+            )
+        };
+        if result == 0 {
+            return Err(format!("Failed to rename file: error code {}", std::io::Error::last_os_error()));
         }
+        return Ok(());
     }
-    std::fs::rename(&from_validated, &to_validated).map_err(|e| e.to_string())
+    #[cfg(not(target_os = "windows"))]
+    {
+        std::fs::rename(&from_validated, &to_validated).map_err(|e| e.to_string())
+    }
 }

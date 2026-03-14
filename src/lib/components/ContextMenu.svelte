@@ -21,16 +21,18 @@
   } = $props()
 
   let menuEl: HTMLElement | undefined = $state()
+  let offsetX = $state(0)
+  let offsetY = $state(0)
 
   // Adjust position to stay in viewport
   onMount(() => {
     if (!menuEl) return
     const rect = menuEl.getBoundingClientRect()
     if (rect.right > window.innerWidth) {
-      menuEl.style.left = `${window.innerWidth - rect.width - 4}px`
+      offsetX = window.innerWidth - rect.right - 4
     }
     if (rect.bottom > window.innerHeight) {
-      menuEl.style.top = `${window.innerHeight - rect.height - 4}px`
+      offsetY = window.innerHeight - rect.bottom - 4
     }
   })
 
@@ -60,8 +62,8 @@
 <div
   class="context-menu"
   bind:this={menuEl}
-  style:left="{x}px"
-  style:top="{y}px"
+  style:left="{x + offsetX}px"
+  style:top="{y + offsetY}px"
 >
   {#each items as item}
     {#if item.separator}

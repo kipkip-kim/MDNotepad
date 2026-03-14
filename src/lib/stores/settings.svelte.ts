@@ -59,7 +59,7 @@ class SettingsStore {
     this._saving = false
     if (this._pendingSave) {
       this._pendingSave = false
-      this.save()
+      await this.save()
     }
   }
 

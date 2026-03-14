@@ -1,27 +1,22 @@
 import { invoke } from '@tauri-apps/api/core'
 import { load } from '@tauri-apps/plugin-store'
 
-let _isPortable: boolean | null = null
-let _portableDir: string | null = null
+// Promise-based cache to prevent race conditions on concurrent calls
+let _isPortablePromise: Promise<boolean> | null = null
+let _portableDirPromise: Promise<string | null> | null = null
 
-export async function isPortable(): Promise<boolean> {
-  if (_isPortable !== null) return _isPortable
-  try {
-    _isPortable = await invoke<boolean>('is_portable')
-  } catch {
-    _isPortable = false
+export function isPortable(): Promise<boolean> {
+  if (!_isPortablePromise) {
+    _isPortablePromise = invoke<boolean>('is_portable').catch(() => false)
   }
-  return _isPortable
+  return _isPortablePromise
 }
 
-export async function getPortableDir(): Promise<string | null> {
-  if (_portableDir !== null) return _portableDir
-  try {
-    _portableDir = await invoke<string>('get_portable_dir')
-  } catch {
-    _portableDir = null
+export function getPortableDir(): Promise<string | null> {
+  if (!_portableDirPromise) {
+    _portableDirPromise = invoke<string>('get_portable_dir').catch(() => null)
   }
-  return _portableDir
+  return _portableDirPromise
 }
 
 /**
