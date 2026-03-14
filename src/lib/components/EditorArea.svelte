@@ -16,6 +16,8 @@
   const sourceEditors = new Map<string, SourceEditorExports>()
   // Map of tabId -> DOM element (source wrapper)
   const sourceElements = new Map<string, HTMLElement>()
+  // Map of tabId -> scroll listener cleanup functions
+  const scrollCleanups = new Map<string, () => void>()
   // Track previous view mode per tab for change detection
   const previousViewModes = new Map<string, 'wysiwyg' | 'source'>()
 
@@ -168,6 +170,8 @@
         const el = editorElements.get(id)
         el?.remove()
         editorElements.delete(id)
+        scrollCleanups.get(id)?.()
+        scrollCleanups.delete(id)
         previousViewModes.delete(id)
       }
     }
@@ -194,6 +198,10 @@
     }
     sourceEditors.clear()
     sourceElements.clear()
+    for (const cleanup of scrollCleanups.values()) {
+      cleanup()
+    }
+    scrollCleanups.clear()
     previousViewModes.clear()
   })
 
@@ -238,9 +246,9 @@
     editorElements.set(tabId, wrapper)
 
     // Track scroll position
-    wrapper.addEventListener('scroll', () => {
-      tabStore.updateScrollTop(tabId, wrapper.scrollTop)
-    })
+    const onScroll = () => tabStore.updateScrollTop(tabId, wrapper.scrollTop)
+    wrapper.addEventListener('scroll', onScroll)
+    scrollCleanups.set(tabId, () => wrapper.removeEventListener('scroll', onScroll))
 
     const editor = new Editor({
       element: wrapper,
@@ -343,8 +351,13 @@
       }
 
       // Track scroll position
-      ta.addEventListener('scroll', () => {
-        tabStore.updateScrollTop(tabId, ta.scrollTop)
+      const onScroll = () => tabStore.updateScrollTop(tabId, ta.scrollTop)
+      ta.addEventListener('scroll', onScroll)
+      // If WYSIWYG already registered a cleanup, chain them
+      const prevCleanup = scrollCleanups.get(tabId)
+      scrollCleanups.set(tabId, () => {
+        prevCleanup?.()
+        ta.removeEventListener('scroll', onScroll)
       })
     }
   }

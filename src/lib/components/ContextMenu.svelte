@@ -23,6 +23,12 @@
   let menuEl: HTMLElement | undefined = $state()
   let offsetX = $state(0)
   let offsetY = $state(0)
+  let focusedIndex = $state(-1)
+
+  // Get non-separator items for keyboard navigation
+  const actionItems = $derived(
+    items.map((item, i) => ({ item, index: i })).filter((e) => !e.item.separator)
+  )
 
   // Adjust position to stay in viewport
   onMount(() => {
@@ -41,6 +47,26 @@
       e.preventDefault()
       e.stopImmediatePropagation()
       onclose()
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      const nextIdx = actionItems.findIndex((e) => e.index > focusedIndex)
+      focusedIndex = nextIdx !== -1 ? actionItems[nextIdx].index : actionItems[0]?.index ?? -1
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      const candidates = actionItems.filter((e) => e.index < focusedIndex)
+      focusedIndex = candidates.length > 0
+        ? candidates[candidates.length - 1].index
+        : actionItems[actionItems.length - 1]?.index ?? -1
+    } else if (e.key === 'Home') {
+      e.preventDefault()
+      focusedIndex = actionItems[0]?.index ?? -1
+    } else if (e.key === 'End') {
+      e.preventDefault()
+      focusedIndex = actionItems[actionItems.length - 1]?.index ?? -1
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      const focused = items[focusedIndex]
+      if (focused && !focused.separator) handleItemClick(focused)
     }
   }
 
@@ -65,14 +91,16 @@
   style:left="{x + offsetX}px"
   style:top="{y + offsetY}px"
 >
-  {#each items as item}
+  {#each items as item, i}
     {#if item.separator}
       <div class="separator"></div>
     {:else}
       <button
         class="context-item"
         class:disabled={item.disabled}
+        class:focused={focusedIndex === i}
         onclick={() => handleItemClick(item)}
+        onmouseenter={() => focusedIndex = i}
       >
         {item.label}
       </button>
@@ -122,7 +150,8 @@
     text-align: left;
   }
 
-  .context-item:hover:not(.disabled) {
+  .context-item:hover:not(.disabled),
+  .context-item.focused:not(.disabled) {
     background: var(--menu-hover);
   }
 

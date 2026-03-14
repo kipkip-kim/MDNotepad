@@ -145,8 +145,8 @@
     resize: none;
     background: transparent;
     color: var(--text-primary);
-    font-family: 'Cascadia Code', 'Consolas', 'Courier New', monospace;
-    font-size: 14px;
+    font-family: var(--font-editor, 'Cascadia Code', 'Consolas', 'Courier New', monospace);
+    font-size: var(--font-size-editor, 14px);
     line-height: 1.6;
     tab-size: 4;
     white-space: pre-wrap;

@@ -37,7 +37,3 @@ export async function writeFile(
 ): Promise<void> {
   await invoke('write_file_with_encoding', { path, content, encoding, lineEnding })
 }
-
-export async function atomicRename(from: string, to: string): Promise<void> {
-  await invoke('atomic_rename', { from, to })
-}

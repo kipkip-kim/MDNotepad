@@ -43,26 +43,45 @@ fn apply_window_effect(window: &tauri::WebviewWindow) {
 
 #[cfg(target_os = "windows")]
 fn is_windows_11() -> bool {
-    // Read build number from registry
-    use std::os::windows::process::CommandExt;
-    use std::process::Command;
-    const CREATE_NO_WINDOW: u32 = 0x08000000;
-    if let Ok(output) = Command::new("reg")
-        .creation_flags(CREATE_NO_WINDOW)
-        .args([
-            "query",
-            r"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion",
-            "/v",
-            "CurrentBuildNumber",
-        ])
-        .output()
-    {
-        let out = String::from_utf8_lossy(&output.stdout);
-        // Output format: "    CurrentBuildNumber    REG_SZ    22621"
-        if let Some(val) = out.split_whitespace().last() {
-            if let Ok(build) = val.parse::<u32>() {
-                return build >= 22000;
-            }
+    use windows_sys::Win32::System::Registry::{
+        RegOpenKeyExW, RegQueryValueExW, RegCloseKey, HKEY_LOCAL_MACHINE, KEY_READ, REG_SZ, HKEY,
+    };
+
+    unsafe {
+        let subkey: Vec<u16> = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\0"
+            .encode_utf16()
+            .collect();
+        let value_name: Vec<u16> = "CurrentBuildNumber\0".encode_utf16().collect();
+
+        let mut hkey: HKEY = std::ptr::null_mut();
+        if RegOpenKeyExW(HKEY_LOCAL_MACHINE, subkey.as_ptr(), 0, KEY_READ, &mut hkey) != 0 {
+            return false;
+        }
+
+        let mut data = [0u8; 64];
+        let mut data_size = data.len() as u32;
+        let mut data_type = 0u32;
+        let result = RegQueryValueExW(
+            hkey,
+            value_name.as_ptr(),
+            std::ptr::null(),
+            &mut data_type,
+            data.as_mut_ptr(),
+            &mut data_size,
+        );
+        RegCloseKey(hkey);
+
+        if result != 0 || data_type != REG_SZ {
+            return false;
+        }
+
+        // Convert UTF-16 LE bytes to string
+        let len = (data_size as usize) / 2;
+        let wide: &[u16] = std::slice::from_raw_parts(data.as_ptr() as *const u16, len);
+        // Trim null terminator
+        let s = String::from_utf16_lossy(wide).trim_end_matches('\0').to_string();
+        if let Ok(build) = s.parse::<u32>() {
+            return build >= 22000;
         }
     }
     false

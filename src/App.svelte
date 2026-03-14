@@ -94,7 +94,6 @@
   function handleKeydown(e: KeyboardEvent) {
     const ctrl = e.ctrlKey || e.metaKey
 
-    // Tab management
     if (ctrl && e.key === 'n') {
       e.preventDefault()
       tabStore.createTab()
@@ -104,10 +103,7 @@
     } else if (ctrl && e.key === 'Tab') {
       e.preventDefault()
       e.shiftKey ? tabStore.prevTab() : tabStore.nextTab()
-    }
-
-    // File operations
-    if (ctrl && e.key === 'o') {
+    } else if (ctrl && e.key === 'o') {
       e.preventDefault()
       safeAsync(() => handleOpen())
     } else if (ctrl && e.shiftKey && e.key === 'S') {
@@ -120,10 +116,7 @@
       const tab = tabStore.activeTab
       const editors = editorArea?.getEditors()
       if (tab && editors) safeAsync(() => handleSave(tab, editors))
-    }
-
-    // Zoom
-    if (ctrl && (e.key === '=' || e.key === '+')) {
+    } else if (ctrl && (e.key === '=' || e.key === '+')) {
       e.preventDefault()
       appState.zoomIn()
     } else if (ctrl && e.key === '-') {
@@ -132,29 +125,17 @@
     } else if (ctrl && e.key === '0') {
       e.preventDefault()
       appState.zoomReset()
-    }
-
-    // Alt+Z - toggle word wrap
-    if (e.altKey && e.key === 'z') {
+    } else if (e.altKey && e.key === 'z') {
       e.preventDefault()
       settingsStore.wordWrap = !settingsStore.wordWrap
       settingsStore.debouncedSave()
-    }
-
-    // Escape - close Settings or FindReplace
-    if (e.key === 'Escape' && appState.showSettings) {
+    } else if (e.key === 'Escape' && appState.showSettings) {
       e.preventDefault()
       appState.showSettings = false
-      return
-    }
-    if (e.key === 'Escape' && appState.showFindReplace) {
+    } else if (e.key === 'Escape' && appState.showFindReplace) {
       e.preventDefault()
       closeFindReplace()
-      return
-    }
-
-    // Find/Replace
-    if (ctrl && e.key === 'f') {
+    } else if (ctrl && e.key === 'f') {
       e.preventDefault()
       appState.showFindReplace = true
       appState.findReplaceMode = 'find'
@@ -162,34 +143,19 @@
       e.preventDefault()
       appState.showFindReplace = true
       appState.findReplaceMode = 'replace'
-    }
-
-    // F5 - Insert date/time
-    if (e.key === 'F5') {
+    } else if (e.key === 'F5') {
       e.preventDefault()
       editorArea?.insertText(new Date().toLocaleString())
-    }
-
-    // Ctrl+G - Go to line
-    if (ctrl && e.key === 'g') {
+    } else if (ctrl && e.key === 'g') {
       e.preventDefault()
       handleGoToLine()
-    }
-
-    // Print
-    if (ctrl && e.key === 'p') {
+    } else if (ctrl && e.key === 'p') {
       e.preventDefault()
       window.print()
-    }
-
-    // Source view toggle
-    if (ctrl && e.key === '/') {
+    } else if (ctrl && e.key === '/') {
       e.preventDefault()
       handleToggleSourceView()
-    }
-
-    // Settings
-    if (ctrl && e.key === ',') {
+    } else if (ctrl && e.key === ',') {
       e.preventDefault()
       appState.showSettings = !appState.showSettings
     }

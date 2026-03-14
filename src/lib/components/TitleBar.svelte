@@ -19,6 +19,7 @@
 
   let openMenu = $state<string | null>(null)
   let menuRefs = $state<Record<string, HTMLElement>>({})
+  let focusedItemIndex = $state(-1)
 
   const appWindow = getCurrentWindow()
 
@@ -78,6 +79,7 @@
       openMenu = null
     } else {
       openMenu = menuLabel
+      focusedItemIndex = -1
     }
   }
 
@@ -95,9 +97,51 @@
 
   function handleKeyDown(e: KeyboardEvent) {
     if (openMenu === null) return
+
+    const menu = menus.find((m) => m.label === openMenu)
+    if (!menu) return
+
+    const actionItems = menu.items
+      .map((item, i) => ({ item, index: i }))
+      .filter((e) => !e.item.separator)
+
     if (e.key === 'Escape') {
       openMenu = null
+      focusedItemIndex = -1
       e.preventDefault()
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      const next = actionItems.findIndex((e) => e.index > focusedItemIndex)
+      focusedItemIndex = next !== -1 ? actionItems[next].index : actionItems[0]?.index ?? -1
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      const candidates = actionItems.filter((e) => e.index < focusedItemIndex)
+      focusedItemIndex = candidates.length > 0
+        ? candidates[candidates.length - 1].index
+        : actionItems[actionItems.length - 1]?.index ?? -1
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault()
+      const idx = menus.findIndex((m) => m.label === openMenu)
+      openMenu = menus[(idx + 1) % menus.length].label
+      focusedItemIndex = -1
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault()
+      const idx = menus.findIndex((m) => m.label === openMenu)
+      openMenu = menus[(idx - 1 + menus.length) % menus.length].label
+      focusedItemIndex = -1
+    } else if (e.key === 'Home') {
+      e.preventDefault()
+      focusedItemIndex = actionItems[0]?.index ?? -1
+    } else if (e.key === 'End') {
+      e.preventDefault()
+      focusedItemIndex = actionItems[actionItems.length - 1]?.index ?? -1
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      const focused = menu.items[focusedItemIndex]
+      if (focused && !focused.separator && !focused.disabled) {
+        handleItemClick(focused)
+        focusedItemIndex = -1
+      }
     }
   }
 
@@ -144,14 +188,16 @@
         </button>
         {#if openMenu === menu.label}
           <div class="dropdown">
-            {#each menu.items as item}
+            {#each menu.items as item, i}
               {#if item.separator}
                 <div class="separator"></div>
               {:else}
                 <button
                   class="dropdown-item"
                   class:disabled={item.disabled}
+                  class:focused={focusedItemIndex === i}
                   onclick={() => handleItemClick(item)}
+                  onmouseenter={() => focusedItemIndex = i}
                 >
                   <span class="item-label">{item.label}</span>
                   {#if item.shortcut}
@@ -272,7 +318,8 @@
     text-align: left;
   }
 
-  .dropdown-item:hover:not(.disabled) {
+  .dropdown-item:hover:not(.disabled),
+  .dropdown-item.focused:not(.disabled) {
     background: var(--menu-hover);
   }
 
